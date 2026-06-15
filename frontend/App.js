@@ -6,9 +6,11 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { API_BASE_URL } from "./src/config";
 import { fallbackMovies } from "./src/data/fallbackMovies";
 import { DiscoverScreen } from "./src/screens/DiscoverScreen";
+import { LoginScreen } from "./src/screens/LoginScreen";
 import { SavedScreen } from "./src/screens/SavedScreen";
 
 function AppContent() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState("discover");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [history, setHistory] = useState([]);
@@ -64,6 +66,15 @@ function AppContent() {
     setHistory((items) => items.slice(0, -1));
     setCurrentIndex((index) => Math.max(0, index - 1));
   };
+
+  if (!isLoggedIn) {
+    return (
+      <SafeAreaView edges={["top", "bottom", "left", "right"]} style={styles.safeArea}>
+        <StatusBar style="light" />
+        <LoginScreen onLogin={() => setIsLoggedIn(true)} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>

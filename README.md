@@ -29,7 +29,7 @@ Then run:
 
 ```bash
 pip install -r requirements.txt
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --host 0.0.0.0
 ```
 
 ## Run the mobile app
@@ -45,6 +45,16 @@ The frontend API URL is configured in `frontend/src/config.js`.
 - Android emulator: keep `http://10.0.2.2:8000`
 - iOS simulator: use `http://localhost:8000`
 - Physical phone: use your computer's local network IP, such as `http://192.168.1.10:8000`
+
+For Expo Go on a physical phone, keep the phone and computer on the same Wi-Fi
+and run this from the `frontend` directory:
+
+```bash
+npx expo start --tunnel --clear
+```
+
+Then scan the QR code with Expo Go. Set `EXPO_PUBLIC_API_URL` in
+`frontend/.env.local` to your computer's Wi-Fi IPv4 address.
 
 ## Author
 
