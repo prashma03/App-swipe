@@ -40,21 +40,17 @@ npm install
 npm start
 ```
 
-The frontend API URL is configured in `frontend/src/config.js`.
-
-- Android emulator: keep `http://10.0.2.2:8000`
-- iOS simulator: use `http://localhost:8000`
-- Physical phone: use your computer's local network IP, such as `http://192.168.1.10:8000`
-
-For Expo Go on a physical phone, keep the phone and computer on the same Wi-Fi
-and run this from the `frontend` directory:
+For Expo Go on a physical phone, keep the phone and computer on the same Wi-Fi.
+The app automatically detects the computer's current network address, so no IP
+address needs to be edited when changing networks. Run this from `frontend`:
 
 ```bash
-npx expo start --tunnel --clear
+npx expo start --lan --clear
 ```
 
-Then scan the QR code with Expo Go. Set `EXPO_PUBLIC_API_URL` in
-`frontend/.env.local` to your computer's Wi-Fi IPv4 address.
+Then scan the QR code with Expo Go. Start the backend with `--host 0.0.0.0` as
+shown above. For use when the phone and computer are on different networks,
+deploy the backend and set its public URL as `EXPO_PUBLIC_API_URL`.
 
 ## Author
 
