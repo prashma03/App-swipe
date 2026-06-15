@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "MovieSwipe",
+    "slug": "movie-swipe",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#090B10"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#090B10"
+      }
+    }
+  }
+}

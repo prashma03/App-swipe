@@ -2,3 +2,6 @@ __pycache__/
 .env
 node_modules/
 .DS_Store
+.expo/
+frontend/.expo/
+frontend/dist/
