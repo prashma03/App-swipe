@@ -7,6 +7,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
@@ -26,9 +27,12 @@ export function DiscoverScreen({
   onOpenSaved,
   onEditPreferences,
   onReload,
+  onSearchChange,
   onSwipe,
   onUndo,
   preferences,
+  searchQuery,
+  totalMovies,
   undoDisabled,
 }) {
   const [detailMovie, setDetailMovie] = useState(null);
@@ -117,6 +121,39 @@ export function DiscoverScreen({
     );
   }
 
+  if (!currentMovie && searchQuery?.trim()) {
+    return (
+      <View style={[styles.screen, isDesktopWeb && styles.screenDesktop]}>
+        <View style={[styles.header, isDesktopWeb && styles.headerDesktop]}>
+          <View>
+            <Text style={[styles.logo, isDesktopWeb && styles.logoDesktop]}>
+              Search movies
+            </Text>
+            <Text style={styles.logoSub}>FIND A TITLE IN YOUR CURRENT STACK</Text>
+          </View>
+        </View>
+
+        <SearchBox
+          onSearchChange={onSearchChange}
+          searchQuery={searchQuery}
+          totalMovies={totalMovies}
+          visibleCount={movies.length}
+        />
+
+        <View style={styles.centered}>
+          <Text style={styles.emptyIcon}>NO RESULTS</Text>
+          <Text style={styles.emptyTitle}>Nothing matched</Text>
+          <Text style={styles.emptyBody}>
+            Try a shorter title, a year, or clear search to return to the full stack.
+          </Text>
+          <Pressable onPress={() => onSearchChange("")} style={styles.reloadButton}>
+            <Text style={styles.reloadText}>Clear search</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   if (!currentMovie) {
     return (
       <View style={styles.centered}>
@@ -185,6 +222,13 @@ export function DiscoverScreen({
           <Text style={styles.tuneText}>Tune</Text>
         </Pressable>
       </View>
+
+      <SearchBox
+        onSearchChange={onSearchChange}
+        searchQuery={searchQuery}
+        totalMovies={totalMovies}
+        visibleCount={movies.length}
+      />
 
       <View style={[styles.deck, isDesktopWeb && styles.deckDesktop]}>
         {!!thirdMovie && (
@@ -270,6 +314,30 @@ export function DiscoverScreen({
           completeSwipe("left");
         }}
       />
+    </View>
+  );
+}
+
+function SearchBox({ onSearchChange, searchQuery, totalMovies, visibleCount }) {
+  return (
+    <View style={styles.searchWrap}>
+      <TextInput
+        autoCapitalize="none"
+        clearButtonMode="while-editing"
+        onChangeText={onSearchChange}
+        placeholder="Search movies by title, plot, or year"
+        placeholderTextColor="#555B68"
+        style={styles.searchInput}
+        value={searchQuery}
+      />
+      {!!searchQuery && (
+        <Pressable onPress={() => onSearchChange("")} style={styles.clearSearch}>
+          <Text style={styles.clearSearchText}>Clear</Text>
+        </Pressable>
+      )}
+      <Text style={styles.searchMeta}>
+        Showing {visibleCount} of {totalMovies || visibleCount} movies
+      </Text>
     </View>
   );
 }
@@ -419,6 +487,44 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: 10,
     paddingVertical: 6,
+    textTransform: "uppercase",
+  },
+  searchWrap: {
+    marginBottom: 13,
+  },
+  searchInput: {
+    backgroundColor: "#14171E",
+    borderColor: "#282C36",
+    borderRadius: 16,
+    borderWidth: 1,
+    color: "#FFFFFF",
+    fontSize: 14,
+    height: 50,
+    paddingHorizontal: 15,
+    paddingRight: 76,
+  },
+  clearSearch: {
+    alignItems: "center",
+    backgroundColor: "rgba(244,162,97,0.14)",
+    borderRadius: 12,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    position: "absolute",
+    right: 8,
+    top: 8,
+  },
+  clearSearchText: {
+    color: "#F4A261",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  searchMeta: {
+    color: "#6C757D",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+    marginTop: 7,
     textTransform: "uppercase",
   },
   tuneChip: {

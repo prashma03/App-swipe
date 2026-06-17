@@ -32,6 +32,7 @@ function AppContent() {
   const [likedMovies, setLikedMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [movies, setMovies] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [apiStatus, setApiStatus] = useState("idle");
   const [preferences, setPreferences] = useState({
     genres: [],
@@ -88,8 +89,16 @@ function AppContent() {
     loadMovies();
   }, [loadMovies]);
 
+  const searchedMovies = filterMovies(movies, searchQuery);
+
+  const updateSearchQuery = (value) => {
+    setSearchQuery(value);
+    setCurrentIndex(0);
+    setHistory([]);
+  };
+
   const handleSwipe = (direction) => {
-    const movie = movies[currentIndex];
+    const movie = searchedMovies[currentIndex];
     if (!movie) return;
 
     if (Platform.OS !== "web") {
@@ -152,7 +161,7 @@ function AppContent() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeTab, currentIndex, hasPreferences, history, isLoggedIn, movies]);
+  }, [activeTab, currentIndex, hasPreferences, history, isLoggedIn, searchedMovies]);
 
   if (!hasSeenOnboarding) {
     return (
@@ -218,8 +227,8 @@ function AppContent() {
                 <DesktopNavItem
                   active={activeTab === "discover"}
                   label="Discover"
-                  meta={`${Math.min(currentIndex + 1, movies.length || 1)} of ${
-                    movies.length || 1
+                  meta={`${Math.min(currentIndex + 1, searchedMovies.length || 1)} of ${
+                    searchedMovies.length || 1
                   }`}
                   onPress={() => setActiveTab("discover")}
                 />
@@ -251,13 +260,16 @@ function AppContent() {
                 isDesktopWeb
                 likedCount={likedMovies.length}
                 loading={loading}
-                movies={movies}
+                movies={searchedMovies}
                 onOpenSaved={() => setActiveTab("saved")}
                 onEditPreferences={() => setHasPreferences(false)}
                 onReload={loadMovies}
+                onSearchChange={updateSearchQuery}
                 onSwipe={handleSwipe}
                 onUndo={undoLastSwipe}
                 preferences={preferences}
+                searchQuery={searchQuery}
+                totalMovies={movies.length}
                 undoDisabled={!history.length}
               />
             </View>
@@ -285,13 +297,16 @@ function AppContent() {
                   apiStatus={apiStatus}
                   likedCount={likedMovies.length}
                   loading={loading}
-                  movies={movies}
+                  movies={searchedMovies}
                   onOpenSaved={() => setActiveTab("saved")}
                   onEditPreferences={() => setHasPreferences(false)}
                   onReload={loadMovies}
+                  onSearchChange={updateSearchQuery}
                   onSwipe={handleSwipe}
                   onUndo={undoLastSwipe}
                   preferences={preferences}
+                  searchQuery={searchQuery}
+                  totalMovies={movies.length}
                   undoDisabled={!history.length}
                 />
               ) : (
@@ -430,6 +445,22 @@ function prepareMovies(items, preferences) {
     }
 
     return Number(b.popularity || 0) - Number(a.popularity || 0);
+  });
+}
+
+function filterMovies(items, query) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return items;
+
+  return items.filter((movie) => {
+    const title = movie.title?.toLowerCase() || "";
+    const overview = movie.overview?.toLowerCase() || "";
+    const year = movie.release_date?.slice(0, 4) || "";
+    return (
+      title.includes(normalizedQuery) ||
+      overview.includes(normalizedQuery) ||
+      year.includes(normalizedQuery)
+    );
   });
 }
 
