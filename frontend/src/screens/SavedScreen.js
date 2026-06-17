@@ -1,144 +1,417 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  ImageBackground,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { useMemo, useState } from "react";
 
-import { TMDB_IMAGE_BASE_URL } from "../config";
+import { getMoviePoster } from "../components/MovieCard";
+import { MovieDetailSheet } from "../components/MovieDetailSheet";
 
-export function SavedScreen({ movies, onDiscover, onRemove }) {
+const SORTS = [
+  { id: "saved", label: "Saved" },
+  { id: "rating", label: "Rating" },
+  { id: "title", label: "Title" },
+];
+
+export function SavedScreen({
+  compact,
+  movies,
+  onDiscover,
+  onRemove,
+  onToggleWatched,
+}) {
+  const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState("saved");
+  const [detailMovie, setDetailMovie] = useState(null);
+
+  const visibleMovies = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const filtered = normalizedQuery
+      ? movies.filter((movie) => movie.title.toLowerCase().includes(normalizedQuery))
+      : movies;
+
+    return [...filtered].sort((a, b) => {
+      if (sortMode === "rating") {
+        return Number(b.vote_average || 0) - Number(a.vote_average || 0);
+      }
+      if (sortMode === "title") {
+        return a.title.localeCompare(b.title);
+      }
+      return 0;
+    });
+  }, [movies, query, sortMode]);
+
   return (
-    <View style={styles.screen}>
-      <Text style={styles.eyebrow}>YOUR COLLECTION</Text>
-      <Text style={styles.heading}>My list</Text>
-      <Text style={styles.subheading}>
-        {movies.length} {movies.length === 1 ? "movie" : "movies"} saved for later
-      </Text>
+    <View style={[styles.screen, compact && styles.screenCompact]}>
+      <View style={[styles.header, compact && styles.headerCompact]}>
+        <View>
+          <Text style={[styles.heading, compact && styles.headingCompact]}>
+            Watchlist
+          </Text>
+          <Text style={styles.subheading}>
+            {movies.length} {movies.length === 1 ? "film" : "films"} saved
+          </Text>
+        </View>
+        <Pressable onPress={onDiscover} style={styles.discoverButton}>
+          <Text style={styles.discoverText}>SWIPE</Text>
+        </Pressable>
+      </View>
 
       {movies.length === 0 ? (
         <View style={styles.empty}>
-          <View style={styles.emptyHeart}>
-            <Text style={styles.emptyHeartText}>♡</Text>
+          <View style={styles.emptyMark}>
+            <Text style={styles.emptyMarkText}>LIST</Text>
           </View>
-          <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+          <Text style={styles.emptyTitle}>No films yet</Text>
           <Text style={styles.emptyBody}>
-            Swipe right on something that looks good and it will appear here.
+            Swipe right on something that looks good and your poster grid will
+            start filling up.
           </Text>
-          <Pressable onPress={onDiscover} style={styles.discoverButton}>
-            <Text style={styles.discoverText}>Discover movies</Text>
+          <Pressable onPress={onDiscover} style={styles.emptyButton}>
+            <Text style={styles.emptyButtonText}>Discover movies</Text>
           </Pressable>
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        >
-          {movies.map((movie) => (
-            <View key={movie.id} style={styles.row}>
-              <Image
-                source={{ uri: `${TMDB_IMAGE_BASE_URL}${movie.poster_path}` }}
-                style={styles.poster}
-              />
-              <View style={styles.info}>
-                <Text numberOfLines={2} style={styles.title}>
-                  {movie.title}
-                </Text>
-                <Text style={styles.meta}>
-                  {movie.release_date?.slice(0, 4) || "Upcoming"}  •  ★{" "}
-                  {Number(movie.vote_average || 0).toFixed(1)}
-                </Text>
-                <Text numberOfLines={2} style={styles.overview}>
-                  {movie.overview}
+        <>
+          <TextInput
+            autoCapitalize="none"
+            onChangeText={setQuery}
+            placeholder="Search your watchlist"
+            placeholderTextColor="#555B68"
+            style={styles.search}
+            value={query}
+          />
+
+          <View style={styles.sortRow}>
+            {SORTS.map((sort) => {
+              const selected = sortMode === sort.id;
+              return (
+                <Pressable
+                  key={sort.id}
+                  onPress={() => setSortMode(sort.id)}
+                  style={[styles.sortChip, selected && styles.sortChipActive]}
+                >
+                  <Text style={[styles.sortText, selected && styles.sortTextActive]}>
+                    {sort.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <FlatList
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={styles.grid}
+            data={visibleMovies}
+            keyExtractor={(movie) => String(movie.id)}
+            ListEmptyComponent={
+              <View style={styles.noResults}>
+                <Text style={styles.noResultsTitle}>No matches</Text>
+                <Text style={styles.noResultsBody}>
+                  Try a shorter title or clear the search.
                 </Text>
               </View>
+            }
+            key={compact ? "compact-list" : "full-list"}
+            numColumns={compact ? 2 : 3}
+            renderItem={({ item }) => (
               <Pressable
-                accessibilityLabel={`Remove ${movie.title}`}
-                onPress={() => onRemove(movie.id)}
-                style={styles.remove}
+                onLongPress={() => onRemove(item.id)}
+                onPress={() => setDetailMovie(item)}
+                style={[styles.tileWrap, compact && styles.tileWrapCompact]}
               >
-                <Text style={styles.removeText}>×</Text>
+                <ImageBackground
+                  imageStyle={styles.tileImage}
+                  source={{ uri: getMoviePoster(item) || undefined }}
+                  style={styles.tile}
+                >
+                  <View style={styles.tileFade} />
+                  {item.watched && (
+                    <View style={styles.watchedBadge}>
+                      <Text style={styles.watchedText}>WATCHED</Text>
+                    </View>
+                  )}
+                  <Text numberOfLines={2} style={styles.tileTitle}>
+                    {item.title}
+                  </Text>
+                </ImageBackground>
+                <Pressable
+                  accessibilityLabel={`Mark ${item.title} watched`}
+                  onPress={() => onToggleWatched(item.id)}
+                  style={styles.watchedToggle}
+                >
+                  <Text style={styles.watchedToggleText}>
+                    {item.watched ? "ON" : "OK"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel={`Remove ${item.title}`}
+                  onPress={() => onRemove(item.id)}
+                  style={styles.remove}
+                >
+                  <Text style={styles.removeText}>x</Text>
+                </Pressable>
               </Pressable>
-            </View>
-          ))}
-          <View style={styles.bottomSpace} />
-        </ScrollView>
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        </>
       )}
+
+      <MovieDetailSheet
+        movie={detailMovie}
+        onClose={() => setDetailMovie(null)}
+        onToggleWatched={() => {
+          onToggleWatched(detailMovie.id);
+          setDetailMovie((movie) => ({ ...movie, watched: !movie.watched }));
+        }}
+        watched={!!detailMovie?.watched}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  eyebrow: {
-    color: "#FF4F75",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 2,
+  screenCompact: {
+    minHeight: 0,
+  },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 18,
+    paddingTop: 13,
+  },
+  headerCompact: {
+    marginBottom: 14,
+    paddingTop: 2,
   },
   heading: {
     color: "#FFFFFF",
     fontSize: 32,
-    fontWeight: "800",
-    letterSpacing: -0.8,
-    marginTop: 3,
+    fontWeight: "900",
+    letterSpacing: -0.7,
+    textTransform: "uppercase",
   },
-  subheading: { color: "#777C88", fontSize: 13, marginTop: 5 },
-  list: { paddingTop: 22 },
-  row: {
-    alignItems: "center",
-    backgroundColor: "#14171E",
-    borderColor: "#222631",
-    borderRadius: 18,
+  headingCompact: {
+    fontSize: 25,
+  },
+  subheading: {
+    color: "#6C757D",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    marginTop: 2,
+    textTransform: "uppercase",
+  },
+  discoverButton: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 20,
     borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  discoverText: {
+    color: "#F4A261",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.3,
+  },
+  search: {
+    backgroundColor: "#14171E",
+    borderColor: "#282C36",
+    borderRadius: 16,
+    borderWidth: 1,
+    color: "#FFFFFF",
+    fontSize: 14,
+    height: 50,
+    marginBottom: 11,
+    paddingHorizontal: 15,
+  },
+  sortRow: {
     flexDirection: "row",
-    marginBottom: 12,
-    padding: 10,
+    gap: 8,
+    marginBottom: 15,
   },
-  poster: {
-    backgroundColor: "#232731",
-    borderRadius: 12,
-    height: 108,
-    width: 72,
+  sortChip: {
+    alignItems: "center",
+    backgroundColor: "#171722",
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: 10,
   },
-  info: { flex: 1, marginLeft: 13 },
-  title: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
-  meta: { color: "#FFB85C", fontSize: 11, fontWeight: "700", marginTop: 5 },
-  overview: { color: "#858A96", fontSize: 11, lineHeight: 16, marginTop: 7 },
+  sortChipActive: {
+    backgroundColor: "rgba(244, 162, 97, 0.16)",
+    borderColor: "#F4A261",
+  },
+  sortText: {
+    color: "#8F95A0",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  sortTextActive: {
+    color: "#F4A261",
+  },
+  grid: {
+    paddingBottom: 105,
+  },
+  row: {
+    gap: 10,
+  },
+  tileWrap: {
+    aspectRatio: 0.66,
+    flex: 1,
+    marginBottom: 10,
+    maxWidth: "31.5%",
+  },
+  tileWrapCompact: {
+    maxWidth: "48%",
+  },
+  tile: {
+    backgroundColor: "#1C1C28",
+    borderRadius: 13,
+    flex: 1,
+    justifyContent: "flex-end",
+    overflow: "hidden",
+  },
+  tileImage: {
+    borderRadius: 13,
+  },
+  tileFade: {
+    backgroundColor: "rgba(0,0,0,0.42)",
+    bottom: 0,
+    height: "44%",
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
+  watchedBadge: {
+    backgroundColor: "rgba(46,204,113,0.92)",
+    borderRadius: 8,
+    left: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    position: "absolute",
+    top: 7,
+  },
+  watchedText: {
+    color: "#FFFFFF",
+    fontSize: 7,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  tileTitle: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 13,
+    padding: 8,
+    textTransform: "uppercase",
+  },
   remove: {
     alignItems: "center",
-    height: 36,
+    backgroundColor: "#E63946",
+    borderColor: "#0A0A0F",
+    borderRadius: 11,
+    borderWidth: 2,
+    height: 22,
     justifyContent: "center",
-    marginLeft: 5,
-    width: 32,
+    position: "absolute",
+    right: -5,
+    top: -5,
+    width: 22,
   },
-  removeText: { color: "#676C78", fontSize: 25, fontWeight: "300" },
-  bottomSpace: { height: 95 },
+  watchedToggle: {
+    alignItems: "center",
+    backgroundColor: "#F4A261",
+    borderColor: "#0A0A0F",
+    borderRadius: 11,
+    borderWidth: 2,
+    bottom: -5,
+    height: 22,
+    justifyContent: "center",
+    left: -5,
+    position: "absolute",
+    width: 28,
+  },
+  watchedToggleText: {
+    color: "#0A0A0F",
+    fontSize: 7,
+    fontWeight: "900",
+  },
+  removeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: -1,
+  },
   empty: {
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 28,
   },
-  emptyHeart: {
+  emptyMark: {
     alignItems: "center",
-    backgroundColor: "#171A22",
-    borderRadius: 42,
-    height: 84,
+    backgroundColor: "#1C1C28",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 44,
+    borderWidth: 1,
+    height: 88,
     justifyContent: "center",
-    marginBottom: 20,
-    width: 84,
+    marginBottom: 22,
+    width: 88,
   },
-  emptyHeartText: { color: "#FF4F75", fontSize: 41 },
-  emptyTitle: { color: "#FFFFFF", fontSize: 23, fontWeight: "800" },
+  emptyMarkText: {
+    color: "#F4A261",
+    fontSize: 13,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+  },
+  emptyTitle: {
+    color: "#FFFFFF",
+    fontSize: 25,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
   emptyBody: {
     color: "#858A96",
     fontSize: 14,
-    lineHeight: 21,
-    marginTop: 9,
+    lineHeight: 22,
+    marginTop: 10,
     textAlign: "center",
   },
-  discoverButton: {
-    backgroundColor: "#FF4F75",
+  emptyButton: {
+    backgroundColor: "#E63946",
     borderRadius: 24,
     marginTop: 24,
     paddingHorizontal: 22,
     paddingVertical: 13,
   },
-  discoverText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+  emptyButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
+  noResults: {
+    alignItems: "center",
+    paddingTop: 70,
+    width: "100%",
+  },
+  noResultsTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  noResultsBody: {
+    color: "#858A96",
+    fontSize: 13,
+    marginTop: 7,
+    textAlign: "center",
+  },
 });

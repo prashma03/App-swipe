@@ -13,6 +13,7 @@ import {
 export function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [showError, setShowError] = useState(false);
 
   const handleLogin = () => {
@@ -22,7 +23,12 @@ export function LoginScreen({ onLogin }) {
     }
 
     setShowError(false);
-    onLogin();
+    onLogin({ email: email.trim(), rememberMe });
+  };
+
+  const handleGuestLogin = () => {
+    setShowError(false);
+    onLogin({ email: "guest@movieswipe.local", rememberMe: false });
   };
 
   return (
@@ -79,6 +85,16 @@ export function LoginScreen({ onLogin }) {
             <Text style={styles.error}>Enter an email and password to continue.</Text>
           )}
 
+          <Pressable
+            onPress={() => setRememberMe((value) => !value)}
+            style={styles.rememberRow}
+          >
+            <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
+              {rememberMe && <Text style={styles.checkboxText}>OK</Text>}
+            </View>
+            <Text style={styles.rememberText}>Remember me on this device</Text>
+          </Pressable>
+
           <Pressable onPress={handleLogin} style={styles.buttonWrap}>
             <LinearGradient
               colors={["#FF6485", "#ED3D69"]}
@@ -90,10 +106,14 @@ export function LoginScreen({ onLogin }) {
               <Text style={styles.arrow}>{"->"}</Text>
             </LinearGradient>
           </Pressable>
+
+          <Pressable onPress={handleGuestLogin} style={styles.guestButton}>
+            <Text style={styles.guestText}>Continue as Guest</Text>
+          </Pressable>
         </View>
 
         <Text style={styles.note}>
-          Demo mode: any email and password will work.
+          Demo mode: any email and password will work. No account needed.
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -191,6 +211,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 12,
   },
+  rememberRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    marginTop: 15,
+  },
+  checkbox: {
+    alignItems: "center",
+    backgroundColor: "#14171E",
+    borderColor: "#282C36",
+    borderRadius: 6,
+    borderWidth: 1,
+    height: 22,
+    justifyContent: "center",
+    width: 22,
+  },
+  checkboxActive: {
+    backgroundColor: "#E63946",
+    borderColor: "#E63946",
+  },
+  checkboxText: {
+    color: "#FFFFFF",
+    fontSize: 7,
+    fontWeight: "900",
+  },
+  rememberText: {
+    color: "#8F95A0",
+    fontSize: 13,
+    fontWeight: "700",
+    marginLeft: 10,
+  },
   buttonWrap: {
     borderRadius: 17,
     marginTop: 25,
@@ -212,6 +262,21 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 17,
     marginLeft: 10,
+  },
+  guestButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 17,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: "center",
+    marginTop: 12,
+  },
+  guestText: {
+    color: "#F4A261",
+    fontSize: 14,
+    fontWeight: "900",
   },
   note: {
     bottom: 30,

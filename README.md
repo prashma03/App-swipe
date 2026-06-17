@@ -27,9 +27,10 @@ TMDB_API_KEY=your_tmdb_api_key
 
 Then run:
 
-```bash
-pip install -r requirements.txt
-uvicorn backend.main:app --reload --host 0.0.0.0
+```powershell
+uv venv .venv
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --host 0.0.0.0
 ```
 
 ## Run the mobile app
