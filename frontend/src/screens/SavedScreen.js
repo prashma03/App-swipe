@@ -1,6 +1,6 @@
 import {
   FlatList,
-  ImageBackground,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -32,7 +32,9 @@ export function SavedScreen({
   const visibleMovies = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const filtered = normalizedQuery
-      ? movies.filter((movie) => movie.title.toLowerCase().includes(normalizedQuery))
+      ? movies.filter((movie) =>
+          (movie.title || "").toLowerCase().includes(normalizedQuery)
+        )
       : movies;
 
     return [...filtered].sort((a, b) => {
@@ -40,7 +42,7 @@ export function SavedScreen({
         return Number(b.vote_average || 0) - Number(a.vote_average || 0);
       }
       if (sortMode === "title") {
-        return a.title.localeCompare(b.title);
+        return (a.title || "").localeCompare(b.title || "");
       }
       return 0;
     });
@@ -115,48 +117,21 @@ export function SavedScreen({
                 <Text style={styles.noResultsBody}>
                   Try a shorter title or clear the search.
                 </Text>
+                <Pressable onPress={() => setQuery("")} style={styles.clearButton}>
+                  <Text style={styles.clearButtonText}>Clear search</Text>
+                </Pressable>
               </View>
             }
             key={compact ? "compact-list" : "full-list"}
             numColumns={compact ? 2 : 3}
             renderItem={({ item }) => (
-              <Pressable
-                onLongPress={() => onRemove(item.id)}
-                onPress={() => setDetailMovie(item)}
-                style={[styles.tileWrap, compact && styles.tileWrapCompact]}
-              >
-                <ImageBackground
-                  imageStyle={styles.tileImage}
-                  source={{ uri: getMoviePoster(item) || undefined }}
-                  style={styles.tile}
-                >
-                  <View style={styles.tileFade} />
-                  {item.watched && (
-                    <View style={styles.watchedBadge}>
-                      <Text style={styles.watchedText}>WATCHED</Text>
-                    </View>
-                  )}
-                  <Text numberOfLines={2} style={styles.tileTitle}>
-                    {item.title}
-                  </Text>
-                </ImageBackground>
-                <Pressable
-                  accessibilityLabel={`Mark ${item.title} watched`}
-                  onPress={() => onToggleWatched(item.id)}
-                  style={styles.watchedToggle}
-                >
-                  <Text style={styles.watchedToggleText}>
-                    {item.watched ? "ON" : "OK"}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityLabel={`Remove ${item.title}`}
-                  onPress={() => onRemove(item.id)}
-                  style={styles.remove}
-                >
-                  <Text style={styles.removeText}>x</Text>
-                </Pressable>
-              </Pressable>
+              <WatchlistTile
+                compact={compact}
+                movie={item}
+                onOpen={() => setDetailMovie(item)}
+                onRemove={() => onRemove(item.id)}
+                onToggleWatched={() => onToggleWatched(item.id)}
+              />
             )}
             showsVerticalScrollIndicator={false}
           />
@@ -173,6 +148,60 @@ export function SavedScreen({
         watched={!!detailMovie?.watched}
       />
     </View>
+  );
+}
+
+function WatchlistTile({
+  compact,
+  movie,
+  onOpen,
+  onRemove,
+  onToggleWatched,
+}) {
+  const poster = getMoviePoster(movie);
+  const title = movie.title || "Untitled film";
+
+  return (
+    <Pressable
+      onLongPress={onRemove}
+      onPress={onOpen}
+      style={[styles.tileWrap, compact && styles.tileWrapCompact]}
+    >
+      <View style={styles.tile}>
+        {poster ? (
+          <Image source={{ uri: poster }} style={styles.tileImage} />
+        ) : (
+          <View style={styles.tilePlaceholder}>
+            <Text style={styles.tilePlaceholderText}>No Poster</Text>
+          </View>
+        )}
+        <View style={styles.tileFade} />
+        {movie.watched && (
+          <View style={styles.watchedBadge}>
+            <Text style={styles.watchedText}>WATCHED</Text>
+          </View>
+        )}
+        <Text numberOfLines={2} style={styles.tileTitle}>
+          {title}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityLabel={`Mark ${title} watched`}
+        onPress={onToggleWatched}
+        style={styles.watchedToggle}
+      >
+        <Text style={styles.watchedToggleText}>
+          {movie.watched ? "YES" : "NEW"}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={`Remove ${title}`}
+        onPress={onRemove}
+        style={styles.remove}
+      >
+        <Text style={styles.removeText}>x</Text>
+      </Pressable>
+    </Pressable>
   );
 }
 
@@ -284,7 +313,23 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   tileImage: {
-    borderRadius: 13,
+    height: "100%",
+    position: "absolute",
+    width: "100%",
+  },
+  tilePlaceholder: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    padding: 8,
+  },
+  tilePlaceholderText: {
+    color: "#6C757D",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textAlign: "center",
+    textTransform: "uppercase",
   },
   tileFade: {
     backgroundColor: "rgba(0,0,0,0.42)",
@@ -413,5 +458,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 7,
     textAlign: "center",
+  },
+  clearButton: {
+    backgroundColor: "rgba(244, 162, 97, 0.14)",
+    borderColor: "rgba(244, 162, 97, 0.24)",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  clearButtonText: {
+    color: "#F4A261",
+    fontSize: 12,
+    fontWeight: "900",
   },
 });

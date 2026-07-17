@@ -20,9 +20,17 @@ import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { PreferencesScreen } from "./src/screens/PreferencesScreen";
 import { SavedScreen } from "./src/screens/SavedScreen";
 
+const STORAGE_KEY = "movieSwipe.appState.v1";
+const DEFAULT_PREFERENCES = {
+  genres: [],
+  minRating: 0,
+  sortMode: "popular",
+};
+
 function AppContent() {
   const { width } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === "web";
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [hasPreferences, setHasPreferences] = useState(false);
@@ -34,11 +42,7 @@ function AppContent() {
   const [movies, setMovies] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [apiStatus, setApiStatus] = useState("idle");
-  const [preferences, setPreferences] = useState({
-    genres: [],
-    minRating: 0,
-    sortMode: "popular",
-  });
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [toast, setToast] = useState("");
   const [toastOpacity] = useState(new Animated.Value(0));
 
@@ -86,8 +90,55 @@ function AppContent() {
   }, [preferences, showToast]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    readPersistedState()
+      .then((savedState) => {
+        if (cancelled || !savedState) return;
+
+        setHasSeenOnboarding(!!savedState.hasSeenOnboarding);
+        setIsLoggedIn(!!savedState.isLoggedIn);
+        setHasPreferences(!!savedState.hasPreferences);
+        setLikedMovies(Array.isArray(savedState.likedMovies) ? savedState.likedMovies : []);
+        setPreferences(normalizePreferences(savedState.preferences));
+        if (savedState.activeTab === "saved" || savedState.activeTab === "discover") {
+          setActiveTab(savedState.activeTab);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setHasHydrated(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
     loadMovies();
-  }, [loadMovies]);
+  }, [hasHydrated, loadMovies]);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    writePersistedState({
+      activeTab,
+      hasPreferences,
+      hasSeenOnboarding,
+      isLoggedIn,
+      likedMovies,
+      preferences,
+    });
+  }, [
+    activeTab,
+    hasHydrated,
+    hasPreferences,
+    hasSeenOnboarding,
+    isLoggedIn,
+    likedMovies,
+    preferences,
+  ]);
 
   const searchedMovies = filterMovies(movies, searchQuery);
 
@@ -162,6 +213,21 @@ function AppContent() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeTab, currentIndex, hasPreferences, history, isLoggedIn, searchedMovies]);
+
+  if (!hasHydrated) {
+    return (
+      <SafeAreaView
+        edges={["top", "bottom", "left", "right"]}
+        style={styles.safeArea}
+      >
+        <StatusBar style="light" />
+        <View style={styles.bootScreen}>
+          <Text style={styles.bootLogo}>CineSwipe</Text>
+          <Text style={styles.bootSub}>LOADING YOUR WATCHLIST</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!hasSeenOnboarding) {
     return (
@@ -424,6 +490,47 @@ function DesktopNavItem({ active, label, meta, onPress }) {
   );
 }
 
+async function readPersistedState() {
+  const storage = getStorage();
+  if (!storage) return null;
+
+  try {
+    const rawState = await storage.getItem(STORAGE_KEY);
+    return rawState ? JSON.parse(rawState) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writePersistedState(state) {
+  const storage = getStorage();
+  if (!storage) return;
+
+  try {
+    await storage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // A full or blocked browser storage should never break movie discovery.
+  }
+}
+
+function getStorage() {
+  if (Platform.OS !== "web" || typeof window === "undefined") return null;
+
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function normalizePreferences(value) {
+  return {
+    ...DEFAULT_PREFERENCES,
+    ...(value || {}),
+    genres: Array.isArray(value?.genres) ? value.genres : [],
+  };
+}
+
 function prepareMovies(items, preferences) {
   const filtered = items.filter((movie) => {
     const matchesGenre =
@@ -499,6 +606,24 @@ const styles = StyleSheet.create({
   desktopFrame: {
     flexDirection: "row",
     padding: 22,
+  },
+  bootScreen: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  bootLogo: {
+    color: "#FFFFFF",
+    fontSize: 40,
+    fontWeight: "900",
+    letterSpacing: -1,
+  },
+  bootSub: {
+    color: "#F4A261",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginTop: 10,
   },
   content: { flex: 1, paddingHorizontal: 18, paddingTop: 6 },
   desktopSidebar: {

@@ -1,21 +1,18 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Animated,
-  Dimensions,
   PanResponder,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 import { MovieCard } from "../components/MovieCard";
 import { MovieDetailSheet } from "../components/MovieDetailSheet";
-
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.24;
 
 export function DiscoverScreen({
   apiStatus,
@@ -35,41 +32,44 @@ export function DiscoverScreen({
   totalMovies,
   undoDisabled,
 }) {
+  const { width } = useWindowDimensions();
   const [detailMovie, setDetailMovie] = useState(null);
   const position = useRef(new Animated.ValueXY()).current;
   const currentMovie = movies[currentIndex];
   const nextMovie = movies[currentIndex + 1];
   const thirdMovie = movies[currentIndex + 2];
-  const progress = movies.length ? currentIndex / movies.length : 0;
+  const screenWidth = Math.min(width || 390, isDesktopWeb ? 520 : 430);
+  const swipeThreshold = screenWidth * 0.24;
+  const progress = movies.length ? (currentIndex + 1) / movies.length : 0;
 
   const rotate = position.x.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+    inputRange: [-screenWidth, 0, screenWidth],
     outputRange: ["-13deg", "0deg", "13deg"],
   });
   const likeOpacity = position.x.interpolate({
-    inputRange: [0, SWIPE_THRESHOLD],
+    inputRange: [0, swipeThreshold],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
   const passOpacity = position.x.interpolate({
-    inputRange: [-SWIPE_THRESHOLD, 0],
+    inputRange: [-swipeThreshold, 0],
     outputRange: [1, 0],
     extrapolate: "clamp",
   });
   const nextScale = position.x.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+    inputRange: [-screenWidth, 0, screenWidth],
     outputRange: [1, 0.955, 1],
     extrapolate: "clamp",
   });
   const nextTranslateY = position.x.interpolate({
-    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+    inputRange: [-screenWidth, 0, screenWidth],
     outputRange: [0, 16, 0],
     extrapolate: "clamp",
   });
 
-  const completeSwipe = (direction) => {
+  const completeSwipe = useCallback((direction) => {
     if (!currentMovie) return;
-    const x = direction === "right" ? SCREEN_WIDTH * 1.4 : -SCREEN_WIDTH * 1.4;
+    const x = direction === "right" ? screenWidth * 1.4 : -screenWidth * 1.4;
     Animated.timing(position, {
       duration: 250,
       toValue: { x, y: -12 },
@@ -78,7 +78,7 @@ export function DiscoverScreen({
       position.setValue({ x: 0, y: 0 });
       onSwipe(direction);
     });
-  };
+  }, [currentMovie, onSwipe, position, screenWidth]);
 
   const panResponder = useMemo(
     () =>
@@ -89,9 +89,9 @@ export function DiscoverScreen({
           position.setValue({ x: gesture.dx, y: gesture.dy * 0.28 });
         },
         onPanResponderRelease: (_, gesture) => {
-          if (gesture.dx > SWIPE_THRESHOLD) {
+          if (gesture.dx > swipeThreshold) {
             completeSwipe("right");
-          } else if (gesture.dx < -SWIPE_THRESHOLD) {
+          } else if (gesture.dx < -swipeThreshold) {
             completeSwipe("left");
           } else {
             Animated.spring(position, {
@@ -103,7 +103,7 @@ export function DiscoverScreen({
           }
         },
       }),
-    [currentIndex, movies.length]
+    [completeSwipe, position, swipeThreshold]
   );
 
   if (loading) {
@@ -343,6 +343,8 @@ function SearchBox({ onSearchChange, searchQuery, totalMovies, visibleCount }) {
 }
 
 function ActionButton({ disabled, label, onPress, small, tone }) {
+  const content = getActionContent(label);
+
   return (
     <Pressable
       disabled={disabled}
@@ -357,12 +359,20 @@ function ActionButton({ disabled, label, onPress, small, tone }) {
         style={[styles.actionButton, small && styles.actionButtonSmall]}
       >
         <Text style={[styles.actionText, small && styles.actionTextSmall]}>
-          {label}
+          {content.symbol}
         </Text>
       </LinearGradient>
-      <Text style={styles.actionLabel}>{label}</Text>
+      <Text style={styles.actionLabel}>{content.label}</Text>
     </Pressable>
   );
+}
+
+function getActionContent(label) {
+  if (label === "UNDO") return { label: "Undo", symbol: "U" };
+  if (label === "NOPE") return { label: "Skip", symbol: "X" };
+  if (label === "INFO") return { label: "Info", symbol: "i" };
+  if (label === "LIKE") return { label: "Save", symbol: "+" };
+  return { label, symbol: label };
 }
 
 function getActionColors(tone) {

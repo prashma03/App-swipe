@@ -28,18 +28,31 @@ export function MovieDetailSheet({
   const trailerUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
     `${movie.title} trailer`
   )}`;
+  const openTrailer = () => {
+    Linking.openURL(trailerUrl).catch(() => {});
+  };
 
   return (
     <Modal animationType="slide" transparent visible onRequestClose={onClose}>
       <Pressable onPress={onClose} style={styles.modalBackdrop}>
         <Pressable style={styles.detailCard}>
           <View style={styles.handle} />
-          <ImageBackground source={{ uri: backdrop }} style={styles.detailBanner}>
-            <LinearGradient
-              colors={["transparent", "#12121A"]}
-              style={styles.detailBannerFade}
-            />
-          </ImageBackground>
+          {backdrop ? (
+            <ImageBackground source={{ uri: backdrop }} style={styles.detailBanner}>
+              <LinearGradient
+                colors={["transparent", "#12121A"]}
+                style={styles.detailBannerFade}
+              />
+            </ImageBackground>
+          ) : (
+            <View style={[styles.detailBanner, styles.detailBannerFallback]}>
+              <Text style={styles.detailBannerFallbackText}>CineSwipe</Text>
+              <LinearGradient
+                colors={["transparent", "#12121A"]}
+                style={styles.detailBannerFade}
+              />
+            </View>
+          )}
 
           <ScrollView
             contentContainerStyle={styles.detailContent}
@@ -72,7 +85,7 @@ export function MovieDetailSheet({
 
             <View style={styles.detailActions}>
               <Pressable
-                onPress={() => Linking.openURL(trailerUrl)}
+                onPress={openTrailer}
                 style={styles.secondaryButton}
               >
                 <Text style={styles.secondaryText}>Trailer</Text>
@@ -142,8 +155,20 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   detailBanner: {
+    backgroundColor: "#1C1C28",
     height: 220,
     justifyContent: "flex-end",
+  },
+  detailBannerFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailBannerFallbackText: {
+    color: "rgba(255,255,255,0.22)",
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   detailBannerFade: {
     bottom: 0,
