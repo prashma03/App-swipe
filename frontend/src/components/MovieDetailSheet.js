@@ -68,8 +68,7 @@ export function MovieDetailSheet({
 
             <Text style={styles.detailTitle}>{movie.title}</Text>
             <Text style={styles.reason}>
-              Picked because it has strong audience buzz, a clean poster read,
-              and fits quick discovery browsing.
+              Audience rating, release year, and popularity at a glance.
             </Text>
 
             <View style={styles.statsRow}>

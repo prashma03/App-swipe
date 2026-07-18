@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "MovieSwipe",
-    "slug": "movie-swipe",
+    "name": "CineSwipe",
+    "slug": "cineswipe",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",

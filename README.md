@@ -1,4 +1,4 @@
-# App-swipe
+# CineSwipe
 
 A Tinder-style movie discovery app where users swipe left or right to find movies they like.
 
@@ -8,7 +8,7 @@ A Tinder-style movie discovery app where users swipe left or right to find movie
 - Discover popular movies from TMDB
 - Save liked movies to a personal list
 - Undo the most recent swipe
-- Continue with demo content when the API is offline
+- Continue browsing starter picks when the API is offline
 
 ## Tech Stack
 
@@ -40,6 +40,22 @@ cd frontend
 npm install
 npm start
 ```
+
+## Deploy the web app
+
+The Expo web build is configured for Vercel and Netlify.
+
+Vercel:
+
+- Build command: `cd frontend && npm ci && npx expo export --platform web --output-dir dist`
+- Output directory: `frontend/dist`
+
+Netlify:
+
+- Build command: `cd frontend && npm ci && npx expo export --platform web --output-dir dist`
+- Publish directory: `frontend/dist`
+
+Both hosts use the checked-in config files for single-page app routing.
 
 For Expo Go on a physical phone, keep the phone and computer on the same Wi-Fi.
 The app automatically detects the computer's current network address, so no IP

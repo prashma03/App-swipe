@@ -195,9 +195,9 @@ export function DiscoverScreen({
         </Pressable>
       </View>
 
-      {apiStatus === "demo" && (
+      {apiStatus === "offline" && (
         <View style={styles.statusBanner}>
-          <Text style={styles.statusText}>Offline mode: showing demo movies</Text>
+          <Text style={styles.statusText}>Offline mode: showing starter picks</Text>
           <Pressable onPress={onReload}>
             <Text style={styles.statusAction}>Retry</Text>
           </Pressable>

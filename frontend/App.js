@@ -20,7 +20,7 @@ import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { PreferencesScreen } from "./src/screens/PreferencesScreen";
 import { SavedScreen } from "./src/screens/SavedScreen";
 
-const STORAGE_KEY = "movieSwipe.appState.v1";
+const STORAGE_KEY = "cineSwipe.appState.v1";
 const DEFAULT_PREFERENCES = {
   genres: [],
   minRating: 0,
@@ -82,8 +82,8 @@ function AppContent() {
       setApiStatus("online");
     } catch {
       setMovies(prepareMovies(fallbackMovies, preferences));
-      setApiStatus("demo");
-      showToast("Using demo movies until the API is reachable");
+      setApiStatus("offline");
+      showToast("Showing saved starter picks while the service reconnects");
     } finally {
       setLoading(false);
     }

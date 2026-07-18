@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd frontend && npm ci && npx expo export --platform web --output-dir dist",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
