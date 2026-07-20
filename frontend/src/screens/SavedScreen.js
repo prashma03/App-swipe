@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getMovieGenres, getMoviePoster } from "../components/MovieCard";
 import { MovieDetailSheet } from "../components/MovieDetailSheet";
@@ -26,6 +26,9 @@ const PICKER_MODES = [
   { id: "edge", label: "Edge", title: "Higher intensity" },
 ];
 
+const DEFAULT_PARTICIPANTS = ["You", "Friend"];
+const SESSION_SECONDS = 60;
+
 export function SavedScreen({
   compact,
   movies,
@@ -38,6 +41,14 @@ export function SavedScreen({
   const [detailMovie, setDetailMovie] = useState(null);
   const [pickerMode, setPickerMode] = useState("crowd");
   const [pickIndex, setPickIndex] = useState(0);
+  const [participants, setParticipants] = useState(DEFAULT_PARTICIPANTS);
+  const [participantInput, setParticipantInput] = useState("");
+  const [nightActive, setNightActive] = useState(false);
+  const [nightMovieIndex, setNightMovieIndex] = useState(0);
+  const [nightPersonIndex, setNightPersonIndex] = useState(0);
+  const [nightSeconds, setNightSeconds] = useState(SESSION_SECONDS);
+  const [nightVotes, setNightVotes] = useState({});
+  const [showNightPlan, setShowNightPlan] = useState(false);
 
   const visibleMovies = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -62,6 +73,109 @@ export function SavedScreen({
     () => chooseTonightPick(movies, pickerMode, pickIndex),
     [movies, pickerMode, pickIndex]
   );
+
+  const nightMovies = useMemo(() => {
+    const unwatched = movies.filter((movie) => !movie.watched);
+    return unwatched.length ? unwatched : movies;
+  }, [movies]);
+
+  const nightPlan = useMemo(
+    () => buildNightPlan(nightMovies, nightVotes, participants),
+    [nightMovies, nightVotes, participants]
+  );
+
+  useEffect(() => {
+    if (!nightActive) return undefined;
+
+    const timer = setInterval(() => {
+      setNightSeconds((value) => {
+        if (value <= 1) {
+          setNightActive(false);
+          setShowNightPlan(true);
+          return 0;
+        }
+        return value - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [nightActive]);
+
+  const addParticipant = () => {
+    const nextName = participantInput.trim();
+    if (!nextName || participants.some((name) => name.toLowerCase() === nextName.toLowerCase())) {
+      return;
+    }
+
+    setParticipants((items) => [...items, nextName]);
+    setParticipantInput("");
+  };
+
+  const removeParticipant = (name) => {
+    setParticipants((items) =>
+      items.length <= 1 ? items : items.filter((item) => item !== name)
+    );
+  };
+
+  const startNightSession = () => {
+    setNightVotes({});
+    setNightMovieIndex(0);
+    setNightPersonIndex(0);
+    setNightSeconds(SESSION_SECONDS);
+    setShowNightPlan(false);
+    setNightActive(true);
+  };
+
+  const resetNightSession = () => {
+    setNightVotes({});
+    setNightMovieIndex(0);
+    setNightPersonIndex(0);
+    setNightSeconds(SESSION_SECONDS);
+    setNightActive(false);
+    setShowNightPlan(false);
+  };
+
+  const finishNightSession = () => {
+    setNightActive(false);
+    setShowNightPlan(true);
+  };
+
+  const recordNightVote = (voteType) => {
+    const movie = nightMovies[nightMovieIndex];
+    const person = participants[nightPersonIndex];
+    if (!movie || !person) return;
+
+    setNightVotes((items) => {
+      const movieVotes = items[movie.id] || { likes: [], passes: [], vetos: [] };
+      const nextVotes = {
+        likes: movieVotes.likes.filter((name) => name !== person),
+        passes: movieVotes.passes.filter((name) => name !== person),
+        vetos: movieVotes.vetos.filter((name) => name !== person),
+      };
+      nextVotes[voteType] = [...nextVotes[voteType], person];
+      return { ...items, [movie.id]: nextVotes };
+    });
+
+    advanceNightStep();
+  };
+
+  const advanceNightStep = () => {
+    const lastMovie = nightMovieIndex >= nightMovies.length - 1;
+    const lastPerson = nightPersonIndex >= participants.length - 1;
+
+    if (lastMovie && lastPerson) {
+      finishNightSession();
+      return;
+    }
+
+    if (lastMovie) {
+      setNightMovieIndex(0);
+      setNightPersonIndex((value) => value + 1);
+      return;
+    }
+
+    setNightMovieIndex((value) => value + 1);
+  };
 
   return (
     <View style={[styles.screen, compact && styles.screenCompact]}>
@@ -105,6 +219,28 @@ export function SavedScreen({
             onOpenPick={() => setDetailMovie(tonightPick?.movie)}
             onShuffle={() => setPickIndex((value) => value + 1)}
             pick={tonightPick}
+          />
+
+          <MovieNightPanel
+            compact={compact}
+            currentMovie={nightMovies[nightMovieIndex]}
+            currentParticipant={participants[nightPersonIndex]}
+            movies={nightMovies}
+            onAddParticipant={addParticipant}
+            onFinish={finishNightSession}
+            onOpenMovie={(movie) => setDetailMovie(movie)}
+            onRecordVote={recordNightVote}
+            onRemoveParticipant={removeParticipant}
+            onReset={resetNightSession}
+            onStart={startNightSession}
+            participantInput={participantInput}
+            participants={participants}
+            plan={nightPlan}
+            progressLabel={`${nightMovieIndex + 1}/${nightMovies.length}`}
+            secondsLeft={nightSeconds}
+            sessionActive={nightActive}
+            setParticipantInput={setParticipantInput}
+            showPlan={showNightPlan}
           />
 
           <TextInput
@@ -245,6 +381,176 @@ function TonightPicker({
   );
 }
 
+function MovieNightPanel({
+  compact,
+  currentMovie,
+  currentParticipant,
+  movies,
+  onAddParticipant,
+  onFinish,
+  onOpenMovie,
+  onRecordVote,
+  onRemoveParticipant,
+  onReset,
+  onStart,
+  participantInput,
+  participants,
+  plan,
+  progressLabel,
+  secondsLeft,
+  sessionActive,
+  setParticipantInput,
+  showPlan,
+}) {
+  const canStart = movies.length > 0 && participants.length > 0;
+
+  if (sessionActive && currentMovie) {
+    return (
+      <View style={[styles.nightPanel, compact && styles.nightPanelCompact]}>
+        <View style={styles.nightHeader}>
+          <View>
+            <Text style={styles.nightKicker}>GROUP MOVIE NIGHT</Text>
+            <Text style={styles.nightTitle}>{currentParticipant}'s turn</Text>
+          </View>
+          <View style={styles.timerBadge}>
+            <Text style={styles.timerText}>{secondsLeft}s</Text>
+          </View>
+        </View>
+
+        <Pressable onPress={() => onOpenMovie(currentMovie)} style={styles.voteCard}>
+          <View style={styles.votePoster}>
+            {getMoviePoster(currentMovie) ? (
+              <Image source={{ uri: getMoviePoster(currentMovie) }} style={styles.votePosterImage} />
+            ) : (
+              <Text style={styles.votePosterText}>FILM</Text>
+            )}
+          </View>
+          <View style={styles.voteCopy}>
+            <Text numberOfLines={1} style={styles.voteTitle}>
+              {currentMovie.title || "Untitled film"}
+            </Text>
+            <Text style={styles.voteMeta}>
+              {progressLabel} / {Number(currentMovie.vote_average || 0).toFixed(1)}
+            </Text>
+            <Text numberOfLines={2} style={styles.voteOverview}>
+              {currentMovie.overview || "Open the card for details before you vote."}
+            </Text>
+          </View>
+        </Pressable>
+
+        <View style={styles.voteActions}>
+          <Pressable onPress={() => onRecordVote("vetos")} style={[styles.voteButton, styles.vetoButton]}>
+            <Text style={styles.voteButtonText}>Veto</Text>
+          </Pressable>
+          <Pressable onPress={() => onRecordVote("passes")} style={styles.voteButton}>
+            <Text style={styles.voteButtonText}>Pass</Text>
+          </Pressable>
+          <Pressable onPress={() => onRecordVote("likes")} style={[styles.voteButton, styles.likeButton]}>
+            <Text style={styles.voteButtonText}>Like</Text>
+          </Pressable>
+        </View>
+
+        <Pressable onPress={onFinish} style={styles.finishLink}>
+          <Text style={styles.finishText}>Build plan now</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (showPlan && plan.length) {
+    return (
+      <View style={[styles.nightPanel, compact && styles.nightPanelCompact]}>
+        <View style={styles.nightHeader}>
+          <View>
+            <Text style={styles.nightKicker}>TONIGHT PLAN</Text>
+            <Text style={styles.nightTitle}>Four clean choices</Text>
+          </View>
+          <Pressable onPress={onReset} style={styles.resetButton}>
+            <Text style={styles.resetText}>RESET</Text>
+          </Pressable>
+        </View>
+
+        {plan.map((item) => (
+          <Pressable
+            key={`${item.slot}-${item.movie.id}`}
+            onPress={() => onOpenMovie(item.movie)}
+            style={styles.planRow}
+          >
+            <Text style={styles.planSlot}>{item.slot}</Text>
+            <View style={styles.planCopy}>
+              <Text numberOfLines={1} style={styles.planTitle}>
+                {item.movie.title || "Untitled film"}
+              </Text>
+              <Text numberOfLines={1} style={styles.planMeta}>
+                {item.reason}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+
+        <View style={styles.shareCard}>
+          <Text style={styles.shareKicker}>SHARE CARD</Text>
+          <Text style={styles.shareTitle}>
+            Tonight: {plan[0].movie.title || "Movie night"}
+          </Text>
+          <Text style={styles.shareBody}>
+            Backup: {plan[plan.length - 1].movie.title || "Saved pick"}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.nightPanel, compact && styles.nightPanelCompact]}>
+      <View style={styles.nightHeader}>
+        <View>
+          <Text style={styles.nightKicker}>GROUP MOVIE NIGHT</Text>
+          <Text style={styles.nightTitle}>Find shared picks</Text>
+        </View>
+        <Pressable
+          disabled={!canStart}
+          onPress={onStart}
+          style={[styles.startButton, !canStart && styles.startButtonDisabled]}
+        >
+          <Text style={styles.startText}>START</Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.nightBody}>
+        Everyone gets a fast pass, like, or veto round. The plan avoids hard no's first.
+      </Text>
+
+      <View style={styles.peopleRow}>
+        {participants.map((name) => (
+          <Pressable
+            key={name}
+            onLongPress={() => onRemoveParticipant(name)}
+            style={styles.personChip}
+          >
+            <Text style={styles.personText}>{name}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.addPersonRow}>
+        <TextInput
+          autoCapitalize="words"
+          onChangeText={setParticipantInput}
+          onSubmitEditing={onAddParticipant}
+          placeholder="Add viewer"
+          placeholderTextColor="#555B68"
+          style={styles.personInput}
+          value={participantInput}
+        />
+        <Pressable onPress={onAddParticipant} style={styles.addPersonButton}>
+          <Text style={styles.addPersonText}>ADD</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function WatchlistTile({
   compact,
   movie,
@@ -297,6 +603,71 @@ function WatchlistTile({
       </Pressable>
     </Pressable>
   );
+}
+
+function buildNightPlan(movies, votesByMovie, participants) {
+  if (!movies.length) return [];
+
+  const scored = movies.map((movie) => {
+    const votes = votesByMovie[movie.id] || { likes: [], passes: [], vetos: [] };
+    const likes = votes.likes.length;
+    const vetos = votes.vetos.length;
+    const passes = votes.passes.length;
+    const rating = Number(movie.vote_average || 0);
+    const popularity = Number(movie.popularity || 0);
+    const score = likes * 100 - vetos * 140 - passes * 12 + rating * 8 + popularity * 0.12;
+
+    return { likes, movie, passes, score, vetos };
+  });
+
+  const noVeto = scored.filter((item) => item.vetos === 0);
+  const decisionPool = noVeto.length ? noVeto : scored;
+  const quickPick = pickUnique(decisionPool, [], (item) => item.score);
+  const crowdPick = pickUnique(
+    decisionPool,
+    [quickPick],
+    (item) => item.likes * 100 + item.score + sharedBonus(item.likes, participants.length)
+  );
+  const wildPick = pickUnique(
+    scored,
+    [quickPick, crowdPick],
+    (item) => Number(item.movie.popularity || 0) + item.likes * 20 - item.vetos * 20
+  );
+  const backupPick = pickUnique(
+    scored,
+    [quickPick, crowdPick, wildPick],
+    (item) => Number(item.movie.vote_average || 0) * 10 - item.vetos * 30
+  );
+
+  return [
+    buildPlanItem("Quick Pick", quickPick, "Best balance of yes votes and low friction"),
+    buildPlanItem("Crowd Pleaser", crowdPick, "Most likely to work for the room"),
+    buildPlanItem("Wild Card", wildPick, "A stronger swing if the room wants energy"),
+    buildPlanItem("Backup", backupPick, "Keep this ready if the first choice stalls"),
+  ].filter(Boolean);
+}
+
+function pickUnique(items, usedItems, getScore) {
+  const usedIds = usedItems.filter(Boolean).map((item) => item.movie.id);
+  const available = items.filter((item) => !usedIds.includes(item.movie.id));
+  const pool = available.length ? available : items;
+  return [...pool].sort((a, b) => getScore(b) - getScore(a))[0];
+}
+
+function sharedBonus(likes, participantCount) {
+  if (!participantCount) return 0;
+  return likes === participantCount ? 80 : 0;
+}
+
+function buildPlanItem(slot, item, reason) {
+  if (!item?.movie) return null;
+
+  const voteText = `${item.likes} like${item.likes === 1 ? "" : "s"}, ${item.vetos} veto${item.vetos === 1 ? "" : "es"}`;
+  return {
+    movie: item.movie,
+    reason: `${reason} / ${voteText}`,
+    slot,
+  };
 }
 
 function chooseTonightPick(movies, mode, pickIndex) {
@@ -410,6 +781,278 @@ const styles = StyleSheet.create({
     height: 50,
     marginBottom: 11,
     paddingHorizontal: 15,
+  },
+  nightPanel: {
+    backgroundColor: "rgba(12, 14, 22, 0.92)",
+    borderColor: "rgba(230, 57, 70, 0.24)",
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 14,
+  },
+  nightPanelCompact: {
+    padding: 12,
+  },
+  nightHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  nightKicker: {
+    color: "#E63946",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+  },
+  nightTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+    marginTop: 4,
+    textTransform: "uppercase",
+  },
+  nightBody: {
+    color: "#A3A7B0",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 11,
+  },
+  timerBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(230, 57, 70, 0.18)",
+    borderColor: "rgba(230, 57, 70, 0.32)",
+    borderRadius: 17,
+    borderWidth: 1,
+    minWidth: 48,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  timerText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  startButton: {
+    backgroundColor: "#E63946",
+    borderRadius: 15,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  startButtonDisabled: {
+    opacity: 0.35,
+  },
+  startText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  resetButton: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 15,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  resetText: {
+    color: "#F4A261",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  peopleRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 12,
+  },
+  personChip: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 13,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  personText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  addPersonRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  personInput: {
+    backgroundColor: "#14171E",
+    borderColor: "#282C36",
+    borderRadius: 14,
+    borderWidth: 1,
+    color: "#FFFFFF",
+    flex: 1,
+    fontSize: 13,
+    height: 42,
+    paddingHorizontal: 13,
+  },
+  addPersonButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(244, 162, 97, 0.16)",
+    borderColor: "rgba(244, 162, 97, 0.30)",
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  addPersonText: {
+    color: "#F4A261",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  voteCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    marginTop: 13,
+    padding: 10,
+  },
+  votePoster: {
+    alignItems: "center",
+    backgroundColor: "#10121B",
+    borderRadius: 10,
+    height: 92,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 62,
+  },
+  votePosterImage: {
+    height: "100%",
+    width: "100%",
+  },
+  votePosterText: {
+    color: "#6C757D",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  voteCopy: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  voteTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  voteMeta: {
+    color: "#F4A261",
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  voteOverview: {
+    color: "#A3A7B0",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 7,
+  },
+  voteActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  voteButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 15,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: 11,
+  },
+  vetoButton: {
+    backgroundColor: "rgba(230, 57, 70, 0.22)",
+    borderColor: "rgba(230, 57, 70, 0.36)",
+  },
+  likeButton: {
+    backgroundColor: "rgba(46, 204, 113, 0.22)",
+    borderColor: "rgba(46, 204, 113, 0.36)",
+  },
+  voteButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  finishLink: {
+    alignItems: "center",
+    paddingTop: 12,
+  },
+  finishText: {
+    color: "#F4A261",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  planRow: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 15,
+    borderWidth: 1,
+    flexDirection: "row",
+    marginTop: 10,
+    padding: 11,
+  },
+  planSlot: {
+    color: "#F4A261",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    width: 86,
+  },
+  planCopy: {
+    flex: 1,
+  },
+  planTitle: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  planMeta: {
+    color: "#858A96",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  shareCard: {
+    backgroundColor: "rgba(244, 162, 97, 0.12)",
+    borderColor: "rgba(244, 162, 97, 0.24)",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 12,
+    padding: 13,
+  },
+  shareKicker: {
+    color: "#F4A261",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+  shareTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  shareBody: {
+    color: "#A3A7B0",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 5,
   },
   picker: {
     backgroundColor: "rgba(20, 22, 34, 0.88)",
