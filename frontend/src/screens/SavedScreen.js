@@ -9,13 +9,21 @@ import {
 } from "react-native";
 import { useMemo, useState } from "react";
 
-import { getMoviePoster } from "../components/MovieCard";
+import { getMovieGenres, getMoviePoster } from "../components/MovieCard";
 import { MovieDetailSheet } from "../components/MovieDetailSheet";
 
 const SORTS = [
   { id: "saved", label: "Saved" },
   { id: "rating", label: "Rating" },
   { id: "title", label: "Title" },
+];
+
+const PICKER_MODES = [
+  { id: "crowd", label: "Crowd", title: "Easy group pick" },
+  { id: "rating", label: "High Score", title: "Best-rated save" },
+  { id: "fresh", label: "Fresh", title: "Newest option" },
+  { id: "comfort", label: "Comfort", title: "Light watch" },
+  { id: "edge", label: "Edge", title: "Higher intensity" },
 ];
 
 export function SavedScreen({
@@ -28,6 +36,8 @@ export function SavedScreen({
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState("saved");
   const [detailMovie, setDetailMovie] = useState(null);
+  const [pickerMode, setPickerMode] = useState("crowd");
+  const [pickIndex, setPickIndex] = useState(0);
 
   const visibleMovies = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -47,6 +57,11 @@ export function SavedScreen({
       return 0;
     });
   }, [movies, query, sortMode]);
+
+  const tonightPick = useMemo(
+    () => chooseTonightPick(movies, pickerMode, pickIndex),
+    [movies, pickerMode, pickIndex]
+  );
 
   return (
     <View style={[styles.screen, compact && styles.screenCompact]}>
@@ -80,6 +95,18 @@ export function SavedScreen({
         </View>
       ) : (
         <>
+          <TonightPicker
+            compact={compact}
+            mode={pickerMode}
+            onModeChange={(nextMode) => {
+              setPickerMode(nextMode);
+              setPickIndex(0);
+            }}
+            onOpenPick={() => setDetailMovie(tonightPick?.movie)}
+            onShuffle={() => setPickIndex((value) => value + 1)}
+            pick={tonightPick}
+          />
+
           <TextInput
             autoCapitalize="none"
             onChangeText={setQuery}
@@ -151,6 +178,73 @@ export function SavedScreen({
   );
 }
 
+function TonightPicker({
+  compact,
+  mode,
+  onModeChange,
+  onOpenPick,
+  onShuffle,
+  pick,
+}) {
+  if (!pick?.movie) return null;
+
+  const title = pick.movie.title || "Untitled film";
+  const year = pick.movie.release_date?.slice(0, 4) || "Soon";
+
+  return (
+    <View style={[styles.picker, compact && styles.pickerCompact]}>
+      <View style={styles.pickerHeader}>
+        <View>
+          <Text style={styles.pickerKicker}>TONIGHT PICKER</Text>
+          <Text
+            numberOfLines={compact ? 2 : 1}
+            style={[styles.pickerTitle, compact && styles.pickerTitleCompact]}
+          >
+            {pick.modeTitle}
+          </Text>
+        </View>
+        <Pressable onPress={onShuffle} style={styles.spinButton}>
+          <Text style={styles.spinText}>SPIN</Text>
+        </Pressable>
+      </View>
+
+      <Pressable onPress={onOpenPick} style={styles.pickRow}>
+        <View style={styles.pickPoster}>
+          {getMoviePoster(pick.movie) ? (
+            <Image source={{ uri: getMoviePoster(pick.movie) }} style={styles.pickImage} />
+          ) : (
+            <Text style={styles.pickPosterText}>FILM</Text>
+          )}
+        </View>
+        <View style={styles.pickCopy}>
+          <Text numberOfLines={1} style={styles.pickTitle}>{title}</Text>
+          <Text style={styles.pickMeta}>
+            {year} / {Number(pick.movie.vote_average || 0).toFixed(1)}
+          </Text>
+          <Text numberOfLines={2} style={styles.pickReason}>{pick.reason}</Text>
+        </View>
+      </Pressable>
+
+      <View style={styles.modeRow}>
+        {PICKER_MODES.map((item) => {
+          const selected = mode === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => onModeChange(item.id)}
+              style={[styles.modeChip, selected && styles.modeChipActive]}
+            >
+              <Text style={[styles.modeText, selected && styles.modeTextActive]}>
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function WatchlistTile({
   compact,
   movie,
@@ -203,6 +297,59 @@ function WatchlistTile({
       </Pressable>
     </Pressable>
   );
+}
+
+function chooseTonightPick(movies, mode, pickIndex) {
+  const candidates = movies.filter((movie) => !movie.watched);
+  const pool = candidates.length ? candidates : movies;
+  if (!pool.length) return null;
+
+  if (mode === "fresh") {
+    const movie = rankMovies(pool, (item) => Date.parse(item.release_date || "0") || 0, pickIndex);
+    return buildPick(movie, "Newest option", "Saved recently enough to still feel fresh.");
+  }
+
+  if (mode === "rating") {
+    const movie = rankMovies(pool, (item) => Number(item.vote_average || 0), pickIndex);
+    return buildPick(movie, "Best-rated save", "Strong rating makes this the safest bet tonight.");
+  }
+
+  if (mode === "comfort") {
+    const movie = rankMovies(pool, (item) => moodScore(item, [16, 35, 10749, 10751]), pickIndex);
+    return buildPick(movie, "Light watch", "A softer pick from the lighter side of your list.");
+  }
+
+  if (mode === "edge") {
+    const movie = rankMovies(pool, (item) => moodScore(item, [27, 28, 53, 80, 9648]), pickIndex);
+    return buildPick(movie, "Higher intensity", "A sharper choice when you want more pulse.");
+  }
+
+  const movie = rankMovies(
+    pool,
+    (item) => Number(item.vote_average || 0) * 10 + Number(item.popularity || 0),
+    pickIndex
+  );
+  return buildPick(movie, "Easy group pick", "Balanced rating and buzz make it an easy yes.");
+}
+
+function rankMovies(movies, getScore, pickIndex) {
+  const ranked = [...movies].sort((a, b) => getScore(b) - getScore(a));
+  return ranked[pickIndex % ranked.length];
+}
+
+function moodScore(movie, genreIds) {
+  const genres = movie.genre_ids || [];
+  const genreBonus = genres.some((genreId) => genreIds.includes(genreId)) ? 100 : 0;
+  return genreBonus + Number(movie.vote_average || 0) * 10 + Number(movie.popularity || 0);
+}
+
+function buildPick(movie, modeTitle, reason) {
+  const genres = getMovieGenres(movie, 2);
+  return {
+    movie,
+    modeTitle,
+    reason: genres.length ? `${reason} ${genres.join(" / ")}.` : reason,
+  };
 }
 
 const styles = StyleSheet.create({
@@ -263,6 +410,124 @@ const styles = StyleSheet.create({
     height: 50,
     marginBottom: 11,
     paddingHorizontal: 15,
+  },
+  picker: {
+    backgroundColor: "rgba(20, 22, 34, 0.88)",
+    borderColor: "rgba(244, 162, 97, 0.18)",
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 14,
+  },
+  pickerCompact: {
+    padding: 12,
+  },
+  pickerHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  pickerKicker: {
+    color: "#F4A261",
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+  },
+  pickerTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+    marginTop: 4,
+    textTransform: "uppercase",
+  },
+  pickerTitleCompact: {
+    fontSize: 15,
+    lineHeight: 18,
+  },
+  spinButton: {
+    backgroundColor: "#E63946",
+    borderRadius: 15,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  spinText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  pickRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    marginTop: 13,
+  },
+  pickPoster: {
+    alignItems: "center",
+    backgroundColor: "#10121B",
+    borderColor: "rgba(255,255,255,0.10)",
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 76,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 52,
+  },
+  pickImage: {
+    height: "100%",
+    width: "100%",
+  },
+  pickPosterText: {
+    color: "#6C757D",
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  pickCopy: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  pickTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  pickMeta: {
+    color: "#F4A261",
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  pickReason: {
+    color: "#A3A7B0",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 5,
+  },
+  modeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 13,
+  },
+  modeChip: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 13,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  modeChipActive: {
+    backgroundColor: "rgba(244, 162, 97, 0.16)",
+    borderColor: "#F4A261",
+  },
+  modeText: {
+    color: "#8F95A0",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  modeTextActive: {
+    color: "#F4A261",
   },
   sortRow: {
     flexDirection: "row",

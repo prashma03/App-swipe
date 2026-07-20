@@ -7,6 +7,7 @@ A Tinder-style movie discovery app where users swipe left or right to find movie
 - Swipe or tap to pass and like movies
 - Discover popular movies from TMDB
 - Save liked movies to a personal list
+- Pick a movie night recommendation from saved films by mood
 - Undo the most recent swipe
 - Continue browsing starter picks when the API is offline
 
